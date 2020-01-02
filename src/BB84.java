@@ -8,6 +8,7 @@ import com.gluonhq.strange.gate.*;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.concurrent.CountDownLatch;
 
 public class BB84 {
 
@@ -16,73 +17,40 @@ public class BB84 {
     static final short CQC_PORT_BOB = 8004;
 
     static final short APP_BOB = 8003;
-// DateFormat formatter = new SimpleDateFormat("HH:mm:ss.SSS");
 
+    static final int SIZE = 16;
+    static final CountDownLatch latch = new CountDownLatch(2);
 
     public static void main(String[] args) throws Exception {
-         bb84();
+         sendQubits();
     }
 
-    public static void sayHello() throws IOException {
-        System.err.println("Sending HELLO to CQC Server");
-        CQCSession s = new CQCSession("Alice", appId);
-        s.connect("localhost", CQC_PORT_ALICE);
-        s.sendHello();
-        ResponseMessage message = s.readMessage();
-        byte type = message.getType();
-        if (type == Protocol.CQC_TP_HELLO) {
-            System.err.println("Respose from CQC Server = HELLO");
-        } else {
-            System.err.println("Something went wrong, no HELLO from CQC Server");
-        }
-    }
-
-    public static void bb84() throws IOException {
-        System.err.println("Teleport from Alice to Bob CQC Server");
+    public static void sendQubits() throws IOException {
+        System.err.println("Send qubit from Alice to Bob CQC Server");
+                    boolean[] base = new boolean[SIZE];
+                    boolean[] val = new boolean[SIZE];
+                    boolean[] bobbase = new boolean[SIZE];
+                    boolean[] bobval = new boolean[SIZE];
         Thread alice = new Thread() {
             @Override public void run() {
                 try {
                     CQCSession s = new CQCSession("Alice", appId);
                     s.connect("localhost", CQC_PORT_ALICE);
-Thread.sleep(1000);
-timeLog("[ALICE] Creating Qubit ");
-                    int qid = s.createQubit();
-timeLog("[ALICE] Created Qubit, id = "+qid);
-
-Thread.sleep(1000);
-
-timeLog("[ALICE] Creating EPR ");
-                    ResponseMessage epr = s.createEPR("BOB", CQC_PORT_BOB);
-                    int qAId = epr.getQubitId();
-timeLog("[ALICE] EPR created, qaid = "+qAId);
-                    short eprPort = epr.getEprOtherPort();
-System.err.println("[ALICE] EPRport = "+eprPort);
-s.applyGate(new X(qid));
-System.err.println("[ALICE] Applying CNot to "+qid+" and "+qAId);
-
-Thread.sleep(1000);
-
-                    s.applyGate(new Cnot(qid, qAId));
-System.err.println("[ALICE] Applying H to "+qid);
-
-Thread.sleep(1000);
-
-                    s.applyGate(new Hadamard(qid));
-System.err.println("[ALICE] measure q0 with id "+qid);
-
-Thread.sleep(1000);
-
-                    boolean qValue = s.measure(qid);
-System.err.println("[ALICE] measured q0 (with id "+qid+"): "+qValue);
-                    boolean qAValue = s.measure(qAId);
-System.err.println("[ALICE] measued q1 (id = "+qAId+"): "+qAValue);
-                    AppSession a = new AppSession();
-                    OutputStream os = a.connect("localhost", APP_BOB);
-                    DataOutputStream dos = new DataOutputStream(os);
-                    dos.writeByte((byte)(qValue ? 1 :0));
-                    dos.writeByte((byte)(qAValue ? 1 :0));
-                    dos.flush();
+                    for (int i = 0; i < SIZE; i++) {
+                        base[i] = Math.random() < .5;
+                        val[i] = Math.random() < .5;
+                        int qid = s.createQubit();
+                        if (base[i]) {
+                            s.applyGate(new Hadamard(qid));
+                        }
+                        if (val[i]) {
+                            s.applyGate(new X(qid));
+                        }
+timeLog("[ALICE] Send qubit ");
+                        s.sendQubit(qid, CQC_PORT_BOB);
 System.err.println("[ALICE] Flushed classical bytes");
+                    }
+latch.countDown();
                 }
                 catch (Throwable t) {
                     t.printStackTrace();
@@ -92,27 +60,25 @@ System.err.println("[ALICE] Flushed classical bytes");
         Thread bob = new Thread() {
             @Override public void run() {
                 try {
-                    AppSession appSession = new AppSession(APP_BOB);
                     CQCSession s = new CQCSession("Bob", appId);
                     s.connect("localhost", CQC_PORT_BOB);
-timeLog("BOB waits for an EPR");
-ResponseMessage gotEpr = s.receiveEPR();
-                    short eprId = gotEpr.getQubitId();
-timeLog("[BOB] BOB received an EPR: "+gotEpr+" with id "+eprId);
-                    byte b0 = appSession.readByte();
-System.err.println("BOB got b0: "+b0);
-                    byte b1 = appSession.readByte();
-System.err.println("BOB got b1: "+b1);
-                    if (b0 == 0x1) {
-System.err.println("BOB apply X");
-                        s.applyGate(new X(eprId));
+                    for (int i = 0; i < SIZE; i++) {
+timeLog("BOB waits for a qubit");
+                        ResponseMessage msg = s.receiveQubit();
+                        short qid = msg.getQubitId();
+                        bobbase[i] = Math.random() < .5;
+                        if (bobbase[i]) {
+                            s.applyGate(new Hadamard(qid));
+                        }
+timeLog("[BOB] BOB received a qubit with id "+qid);
+                        boolean qValue = s.measure(qid);
+timeLog("[BOB] Bob measures "+qValue);
+                        bobval[i] = qValue;
                     }
-                    if (b1 == 0x1) {
-System.err.println("BOB apply Z");
-                        s.applyGate(new Z(eprId));
-                    }
-                    boolean qValue = s.measure(eprId);
-System.err.println("BOB got value: "+qValue);
+latch.countDown();
+                    // s.releaseQubit(qid);
+// timeLog("[BOB] Bob released "+qid);
+
                 }
                 catch (Throwable t) {
                     t.printStackTrace();
@@ -121,6 +87,14 @@ System.err.println("BOB got value: "+qValue);
         };
         bob.start();
         alice.start();
+try {
+latch.await();
+} catch (InterruptedException e) {
+e.printStackTrace();
+}
+for (int i = 0; i < SIZE; i++) {
+System.err.println("A base = "+base[i]+" and aval = "+val[i]+";  B base = "+bobbase[i]+" and bval = "+bobval[i]);
+}
     }
 
     static void timeLog(String msg) {
