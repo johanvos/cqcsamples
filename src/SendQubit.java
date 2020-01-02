@@ -30,15 +30,17 @@ public class SendQubit {
                 try {
                     CQCSession s = new CQCSession("Alice", appId);
                     s.connect("localhost", CQC_PORT_ALICE);
-Thread.sleep(1000);
 timeLog("[ALICE] Creating Qubit ");
                     int qid = s.createQubit();
 timeLog("[ALICE] Created Qubit, id = "+qid);
+timeLog("[ALICE] dontApply X");
+// s.applyGate(new X(qid));
+timeLog("[ALICE] Applied X");
 
-Thread.sleep(1000);
+// Thread.sleep(1000);
 
 timeLog("[ALICE] Send qubit ");
-                    ResponseMessage epr = s.sendQubit(qid, CQC_PORT_BOB);
+                    s.sendQubit(qid, CQC_PORT_BOB);
 System.err.println("[ALICE] Flushed classical bytes");
                 }
                 catch (Throwable t) {
@@ -49,13 +51,17 @@ System.err.println("[ALICE] Flushed classical bytes");
         Thread bob = new Thread() {
             @Override public void run() {
                 try {
-                    AppSession appSession = new AppSession(APP_BOB);
                     CQCSession s = new CQCSession("Bob", appId);
                     s.connect("localhost", CQC_PORT_BOB);
 timeLog("BOB waits for a qubit");
 ResponseMessage gotEpr = s.receiveQubit();
-                    short eprId = gotEpr.getQubitId();
-timeLog("[BOB] BOB received an EPR: "+gotEpr+" with id "+eprId);
+                    short qid = gotEpr.getQubitId();
+timeLog("[BOB] BOB received a qubit: "+gotEpr+" with id "+qid);
+                    boolean qValue = s.measure(qid);
+timeLog("[BOB] Bob measures "+qValue);
+                    // s.releaseQubit(qid);
+// timeLog("[BOB] Bob released "+qid);
+
                 }
                 catch (Throwable t) {
                     t.printStackTrace();
