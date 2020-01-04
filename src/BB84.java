@@ -40,15 +40,16 @@ public class BB84 {
                         base[i] = Math.random() < .5;
                         val[i] = Math.random() < .5;
                         int qid = s.createQubit();
-                        if (base[i]) {
-                            s.applyGate(new Hadamard(qid));
-                        }
+timeLog("[ALICE] GOT qubit " + qid);
                         if (val[i]) {
                             s.applyGate(new X(qid));
                         }
-timeLog("[ALICE] Send qubit ");
-                        s.sendQubit(qid, CQC_PORT_BOB);
-System.err.println("[ALICE] Flushed classical bytes");
+                        if (base[i]) {
+                            s.applyGate(new Hadamard(qid));
+                        }
+timeLog("[ALICE] dealt with qubit "+ qid+" in run "+i);
+                         s.sendQubit(qid, CQC_PORT_BOB);
+// System.err.println("[ALICE] Flushed classical bytes");
                     }
 latch.countDown();
                 }
@@ -63,7 +64,7 @@ latch.countDown();
                     CQCSession s = new CQCSession("Bob", appId);
                     s.connect("localhost", CQC_PORT_BOB);
                     for (int i = 0; i < SIZE; i++) {
-timeLog("BOB waits for a qubit");
+timeLog("BOB waits for a qubit in run "+i);
                         ResponseMessage msg = s.receiveQubit();
                         short qid = msg.getQubitId();
                         bobbase[i] = Math.random() < .5;
