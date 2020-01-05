@@ -23,6 +23,7 @@ public class Bob {
     InputStream classicInputStream;
     private byte[] key;
     int keyCnt = 0;
+    private CQCSession cqcSession;
 
     public void startBob() throws InterruptedException {
         final CountDownLatch latch = new CountDownLatch(1);
@@ -30,6 +31,8 @@ public class Bob {
             @Override
             public void run() {
                 try {
+                    cqcSession = new CQCSession("Bob", Main.appId);
+                    cqcSession.connect("localhost", Main.CQC_PORT_BOB, Main.APP_PORT_BOB);
                     ServerSocket serverSocket = new ServerSocket(9753);
                     latch.countDown();
                     key = getKey(20);
@@ -60,15 +63,10 @@ public class Bob {
 //            return 10;
         }
 
-        boolean eol = false;
-
         @Override
         public int read(byte b[], int off, int length) throws IOException {
-            System.err.println("READ[]II asked, off = " + off + ", length = " + length);
             int size = is.read(b, off, length);
-            System.err.println("Return size: " + size);
             for (int i = 0; i < size; i++) {
-                System.err.println("Byte[" + i + "] = " + b[i]);
                 b[i] = (byte) (b[i] ^ (byte) getNextKey());
             }
             return size;
@@ -76,17 +74,13 @@ public class Bob {
 
         @Override
         public int available() throws IOException {
-            int answer = is.available();
-            System.err.println("AVAILABLE asked, return " + answer);
-            return answer;
+            return is.available();
         }
 
         public int read() throws IOException {
             if (is.available() == 0) return -1;
             int secret = is.read();
             int orig = secret ^ getNextKey();
-            System.err.println("did read " + secret + ", converted into " + orig);
-            if (orig == 10) eol = true;
             return orig;
         }
     }
@@ -119,22 +113,18 @@ public class Bob {
         int validSize = 0;
 
         try {
-            CQCSession s = new CQCSession("Bob", Main.appId);
-            s.connect("localhost", Main.CQC_PORT_BOB);
+
             for (int i = 0; i < size; i++) {
                 timeLog("BOB waits for a qubit");
-                int qid = s.receiveQubit();
-                // short qid = gotEpr.getQubitId();
+                int qid = cqcSession.receiveQubit();
                 timeLog("[BOB] BOB received a qubit with id " + qid);
                 base[i] = random.nextBoolean();
                 if (base[i]) {
-                    s.applyGate(new Hadamard(qid));
+                    cqcSession.applyGate(new Hadamard(qid));
                 }
-                boolean qValue = s.measure(qid);
+                boolean qValue = cqcSession.measure(qid);
                 key[i] = qValue;
                 timeLog("[BOB] Key " + i + ": Bob measures " + qValue + " in base " + base[i]);
-                // s.releaseQubit(qid);
-// timeLog("[BOB] Bob released "+qid);
             }
             if (!classicOpen) {
                 serverSocket = new ServerSocket(Main.APP_PORT_BOB);

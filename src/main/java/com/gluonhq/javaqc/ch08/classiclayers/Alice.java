@@ -6,7 +6,6 @@ import java.io.OutputStream;
 import java.io.PrintStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.Arrays;
 import java.util.BitSet;
@@ -23,6 +22,7 @@ public class Alice {
     OutputStream classicOutputStream;
     private byte[] key;
     int keyCnt = 0;
+    private CQCSession cqcSession;
 
     private byte[] getKey(int size) throws IOException {
         int bitSize = 8 * size;
@@ -47,6 +47,8 @@ public class Alice {
             @Override
             public void run() {
                 try {
+                    cqcSession = new CQCSession("Alice", Main.appId);
+                    cqcSession.connect("localhost", Main.CQC_PORT_ALICE, Main.APP_PORT_ALICE);
                     key = getKey(20);
                     System.err.println("Start alice");
                     Socket socket = new Socket();
@@ -97,17 +99,16 @@ public class Alice {
         boolean[] validKey = new boolean[size];
 
         try {
-            CQCSession s = new CQCSession("Alice", Main.appId);
-            s.connect("localhost", Main.CQC_PORT_ALICE);
+
             for (int i = 0; i < size; i++) {
                 key[i] = random.nextBoolean();
                 base[i] = random.nextBoolean();
                 timeLog("[ALICE] Creating Qubit " + i + " in base " + base[i] + " with val " + key[i]);
-                int qid = s.createQubit();
-                if (key[i]) s.applyGate(new X(qid));
-                if (base[i]) s.applyGate(new Hadamard(qid));
+                int qid = cqcSession.createQubit();
+                if (key[i]) cqcSession.applyGate(new X(qid));
+                if (base[i]) cqcSession.applyGate(new Hadamard(qid));
                 timeLog("[ALICE] Send qubit ");
-                s.sendQubit(qid, Main.CQC_PORT_BOB);
+                cqcSession.sendQubit(qid, Main.CQC_PORT_BOB);
             }
             System.err.println("Done sending qubits, lets evaluate now");
             Thread.sleep(2000);

@@ -6,7 +6,8 @@ public class Main {
     static final short CQC_PORT_ALICE = 8001;
     static final short CQC_PORT_BOB = 8004;
 
-    static final short APP_PORT_BOB=8103;
+    static final short APP_PORT_ALICE=8000;
+    static final short APP_PORT_BOB=8003;
 
     public static void main(String[] args) throws InterruptedException {
         System.err.println("Hello, classic layers");
