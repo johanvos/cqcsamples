@@ -21,6 +21,8 @@ public class Alice {
     Socket classicSocket;
     InputStream classicInputStream;
     OutputStream classicOutputStream;
+    private byte[] key;
+    int keyCnt = 0;
 
     private byte[] getKey(int size) throws IOException {
         int bitSize = 8 * size;
@@ -45,7 +47,7 @@ public class Alice {
             @Override
             public void run() {
                 try {
-                    getKey(2);
+                    key = getKey(20);
                     System.err.println("Start alice");
                     Socket socket = new Socket();
                     socket.connect(new InetSocketAddress(InetAddress.getLocalHost(), 9753), 50000);
@@ -71,7 +73,8 @@ public class Alice {
         private final OutputStream os;
 
         int getNextKey() {
-            return 10;
+            return key[keyCnt++];
+//            return 10;
         }
 
         public SecureOutputStream(OutputStream os) {

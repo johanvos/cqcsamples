@@ -21,6 +21,8 @@ public class Bob {
     ServerSocket serverSocket;
     Socket socket;
     InputStream classicInputStream;
+    private byte[] key;
+    int keyCnt = 0;
 
     public void startBob() throws InterruptedException {
         final CountDownLatch latch = new CountDownLatch(1);
@@ -30,7 +32,7 @@ public class Bob {
                 try {
                     ServerSocket serverSocket = new ServerSocket(9753);
                     latch.countDown();
-                    getKey(2);
+                    key = getKey(20);
                     Socket socket = serverSocket.accept();
                     InputStream is = new SecureInputStream(socket.getInputStream());
                     BufferedReader reader = new BufferedReader(new InputStreamReader(is));
@@ -54,7 +56,8 @@ public class Bob {
         }
 
         int getNextKey() {
-            return 10;
+            return key[keyCnt++];
+//            return 10;
         }
 
         boolean eol = false;
