@@ -109,6 +109,7 @@ public class Alice {
                 if (base[i]) cqcSession.applyGate(new Hadamard(qid));
                 timeLog("[ALICE] Send qubit ");
                 cqcSession.sendQubit(qid, Main.CQC_PORT_BOB);
+                Thread.sleep(10);
             }
             System.err.println("Done sending qubits, lets evaluate now");
             Thread.sleep(2000);
